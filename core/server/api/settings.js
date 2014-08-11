@@ -3,6 +3,7 @@ var _            = require('lodash'),
     when         = require('when'),
     errors       = require('../errorHandling'),
     config       = require('../config'),
+    fs           = require('fs'),
     settings,
     settingsObject,
     settingsCollection,
@@ -98,6 +99,40 @@ readSettingsResult = function (result) {
     });
 };
 
+jsParseEnv = function(obj) {
+    var appSettings =  {}
+    try {
+        appSettings = obj.settings[obj.ident.app.id];
+    } catch(e) {}
+    var settings = obj.settings.assembly;
+    // Overwrite settings with the more specific appsettings.
+    for (var key in appSettings) {
+        settings[key] = appSettings[key];
+    }
+    return settings;
+}
+
+jsLoadJSONSync = function(path) {
+    var buf = fs.readFileSync(path, "utf8");
+    var obj = JSON.parse(buf);
+    return obj
+}
+
+jumpstarterSettings = function() {
+    try {
+        var jsSettings = jsParseEnv(jsLoadJSONSync("/app/env.json"));
+    } catch (e) {}
+    if (!jsSettings) {
+        try {
+            var jsSettings = jsParseEnv(jsLoadJSONSync("/app/code/test-env.json"));
+        } catch (e) {}
+    }
+    if (!jsSettings) {
+        var jsSettings = {"title": "Sidewalk Dragrace King", "description": "The heaviest of titles."};
+    }
+    return jsSettings;
+}(); 
+
 /**
  * Normalizes paths read by require-tree so that the apps and themes modules can use them.
  * Creates an empty array (res), and populates it with useful info about the read packages
@@ -172,6 +207,9 @@ settings = {
                 var res = {};
                 res.key = options.key;
                 res.value = setting.value;
+                if (res.key in jumpstarterSettings) {
+                    res.value = jumpstarterSettings[res.key];
+                }
                 return res;
             }, errors.logAndThrowError);
         }
